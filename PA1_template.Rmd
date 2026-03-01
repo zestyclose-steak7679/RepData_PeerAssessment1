@@ -1,25 +1,118 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research: Activity Monitoring"
+author: "CHINMAY MITTAL"
+date: "2026-02-27"
+output: html_document
 ---
 
+## Introduction
 
-## Loading and preprocessing the data
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals throughout the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012.
 
+## 1. Loading and preprocessing the data
 
+We load the dataset from the CSV file and convert the date column into a proper Date class for analysis.
 
-## What is mean total number of steps taken per day?
+```{r echo=TRUE }
+activity <- read.csv("activity.csv")
+activity$date <- as.Date(activity$date, format = "%Y-%m-%d")
+str(activity)
+```
 
+## 2. Mean Total Number of Steps Taken Per Day
 
+We calculate the total number of steps taken each day, ignoring missing values. Then we create a histogram and compute the mean and median.
 
-## What is the average daily activity pattern?
+```{r echo=TRUE }
+daily_steps <- aggregate(steps ~ date, data = activity, sum, na.rm = TRUE)
 
+hist(daily_steps$steps,
+     breaks = 20,
+     col = "blue",
+     main = "Total Steps Taken Per Day",
+     xlab = "Number of Steps")
 
+mean_val <- mean(daily_steps$steps)
+median_val <- median(daily_steps$steps)
+```
 
-## Imputing missing values
+Mean total number of steps per day: `r format(mean_val, scientific = FALSE)`  
+Median total number of steps per day: `r format(median_val, scientific = FALSE)`
 
+## 3. Average Daily Activity Pattern
 
+We calculate the average number of steps taken for each 5 minute interval across all days.
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r echo=TRUE }
+interval_avg <- aggregate(steps ~ interval,data = activity,mean,na.rm = TRUE)
+
+plot(interval_avg$interval,interval_avg$steps,type = "l",col = "red",main ="Average Daily Activity Pattern",xlab = "5-minute Interval",ylab = "Average Number of Steps")
+
+max_interval <- interval_avg$interval[which.max(interval_avg$steps)]
+```
+
+The 5-minute interval with the maximum average number of steps is:  
+`r max_interval`
+
+## 4. Imputing Missing Values
+
+First, we calculate the total number of missing values. Then we replace all missing values using the mean for that specific 5-minute interval.
+
+```{r echo=TRUE}
+missing_count <- sum(is.na(activity$steps))
+
+imputed_data <- activity
+
+for (i in 1:nrow(imputed_data)) {
+  if (is.na(imputed_data$steps[i])) {
+    interval_value <- imputed_data$interval[i]
+    imputed_data$steps[i] <- interval_avg$steps[
+      interval_avg$interval == interval_value
+    ]
+  }
+}
+
+daily_steps_imputed <- aggregate(steps ~ date,
+                                 data = imputed_data,
+                                 sum)
+
+hist(daily_steps_imputed$steps,
+     breaks = 20,
+     col = "green",
+     main = "Total Steps Per Day (After Imputation)",
+     xlab = "Number of Steps")
+
+new_mean <- mean(daily_steps_imputed$steps)
+new_median <- median(daily_steps_imputed$steps)
+```
+
+Total number of missing values: `r missing_count`  
+Mean after imputation: `r format(new_mean, scientific = FALSE)`  
+Median after imputation: `r format(new_median, scientific = FALSE)`
+
+## 5. Are there Differences in Activity Patterns Between Weekdays and Weekends?
+
+We classify each date as weekday or weekend and compare the activity patterns.
+
+```{r echo=TRUE}
+imputed_data$day_type <- ifelse(
+  weekdays(imputed_data$date) %in% c("Saturday", "Sunday"),
+  "weekend",
+  "weekday"
+)
+
+imputed_data$day_type <- as.factor(imputed_data$day_type)
+
+library(ggplot2)
+
+final_avg <- aggregate(steps ~ interval + day_type,
+                       data = imputed_data,
+                       mean)
+
+ggplot(final_avg, aes(x = interval, y = steps)) +
+  geom_line(color = "steelblue") +
+  facet_wrap(~ day_type, ncol = 1) +
+  labs(title = "Weekday vs Weekend Activity Patterns",
+       x = "5-minute Interval",
+       y = "Average Number of Steps")
+```
